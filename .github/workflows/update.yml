@@ -1,0 +1,45 @@
+name: Update busy calendar feed
+
+# Runs automatically every 4 hours, and can also be triggered manually
+# from the Actions tab in GitHub ("Run workflow" button).
+on:
+  schedule:
+    - cron: "0 */4 * * *"
+  workflow_dispatch: {}
+
+# Needed so the workflow is allowed to commit the updated busy.ics file
+# back into the repository.
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests icalendar
+
+      - name: Redact calendar
+        env:
+          ICLOUD_ICS_URL: ${{ secrets.ICLOUD_ICS_URL }}
+        run: python redact_calendar.py
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add busy.ics
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update busy feed"
+            git push
+          fi
